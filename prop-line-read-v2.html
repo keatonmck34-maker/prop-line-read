@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prop Line Read</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root {
+    --bg: #12140f;
+    --panel: #1b2016;
+    --panel-border: #2e3524;
+    --turf: #4a6b32;
+    --turf-bright: #6b9247;
+    --gold: #d9a628;
+    --chalk: #eeeae0;
+    --muted: #8d9481;
+    --under: #c1533b;
+    --focus: #e8c65a;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--chalk);
+    font-family: 'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    padding: 0 0 60px;
+  }
+
+  .yardmarks {
+    height: 10px;
+    width: 100%;
+    background-image: repeating-linear-gradient(
+      90deg,
+      var(--turf) 0px, var(--turf) 2px,
+      transparent 2px, transparent 28px
+    );
+    opacity: 0.6;
+  }
+
+  header {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 36px 20px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .header-text h1 {
+    font-family: 'Anton', sans-serif;
+    font-weight: 400;
+    letter-spacing: 0.5px;
+    font-size: clamp(32px, 7vw, 44px);
+    margin: 0 0 6px;
+    line-height: 0.95;
+    color: var(--chalk);
+  }
+
+  .header-text h1 span { color: var(--gold); }
+
+  header p {
+    color: var(--muted);
+    margin: 0;
+    font-size: 15px;
+    max-width: 46ch;
+    line-height: 1.5;
+  }
+
+  .account-box {
+    font-size: 13px;
+    color: var(--muted);
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .account-box .email { color: var(--chalk); display: block; margin-bottom: 4px; }
+
+  .link-btn {
+    background: none;
+    border: none;
+    color: var(--turf-bright);
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+    padding: 0;
+    text-decoration: underline;
+  }
+
+  main {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 0 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    padding: 22px;
+  }
+
+  .panel h2 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--turf-bright);
+    margin: 0 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .panel h2::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    background: var(--gold);
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+
+  .field:last-child { margin-bottom: 0; }
+
+  .field label {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .row2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  input[type="text"], input[type="number"], input[type="email"], input[type="password"], select {
+    background: #0f1210;
+    border: 1px solid var(--panel-border);
+    color: var(--chalk);
+    padding: 10px 12px;
+    border-radius: 3px;
+    font-size: 15px;
+    font-family: inherit;
+    width: 100%;
+  }
+
+  input:focus, select:focus, button:focus {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+  }
+
+  .toggle {
+    display: flex;
+    border: 1px solid var(--panel-border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .toggle button {
+    flex: 1;
+    background: #0f1210;
+    color: var(--muted);
+    border: none;
+    padding: 10px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .toggle button.active.over { background: var(--turf); color: var(--chalk); }
+  .toggle button.active.under { background: var(--under); color: var(--chalk); }
+
+  .games-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+
+  .game-row {
+    display: grid;
+    grid-template-columns: 28px 1fr 32px;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .game-row .idx {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+  }
+
+  .game-row button {
+    background: none;
+    border: 1px solid var(--panel-border);
+    color: var(--muted);
+    border-radius: 3px;
+    height: 36px;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+  }
+
+  .game-row button:hover { color: var(--under); border-color: var(--under); }
+
+  .add-game {
+    background: none;
+    border: 1px dashed var(--panel-border);
+    color: var(--turf-bright);
+    padding: 10px;
+    border-radius: 3px;
+    width: 100%;
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    margin-bottom: 14px;
+  }
+
+  .add-game:hover { border-color: var(--turf-bright); }
+
+  .calc-btn, .primary-btn {
+    background: var(--gold);
+    color: #12140f;
+    border: none;
+    padding: 14px;
+    border-radius: 3px;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 15px;
+    width: 100%;
+    cursor: pointer;
+  }
+
+  .calc-btn:hover, .primary-btn:hover { background: #e8c65a; }
+  .calc-btn:disabled, .primary-btn:disabled { background: var(--panel-border); color: var(--muted); cursor: not-allowed; }
+
+  .error-msg { color: var(--under); font-size: 13px; margin-top: 8px; }
+  .success-msg { color: var(--turf-bright); font-size: 13px; margin-top: 8px; }
+
+  .result-hero {
+    text-align: left;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--panel-border);
+    margin-bottom: 18px;
+  }
+
+  .result-hero .call { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  .result-hero .pct { font-family: 'Anton', sans-serif; font-size: clamp(52px, 14vw, 76px); line-height: 0.9; }
+  .result-hero .pct.over { color: var(--turf-bright); }
+  .result-hero .pct.under { color: var(--under); }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
+
+  .stat-box { background: #0f1210; border: 1px solid var(--panel-border); border-radius: 3px; padding: 12px; }
+  .stat-box .label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .stat-box .value { font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 500; }
+
+  .chart { display: flex; align-items: flex-end; gap: 6px; height: 120px; padding-top: 10px; position: relative; margin-bottom: 8px; }
+  .chart .line-marker { position: absolute; left: 0; right: 0; border-top: 2px dashed var(--gold); }
+  .chart .line-label { position: absolute; right: 0; top: -18px; font-size: 11px; color: var(--gold); font-family: 'IBM Plex Mono', monospace; }
+
+  .bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 4px; }
+  .bar { width: 100%; border-radius: 2px 2px 0 0; background: var(--turf); min-height: 3px; }
+  .bar.over-line { background: var(--turf-bright); }
+  .bar.under-line { background: var(--under); }
+  .bar-num { font-size: 10px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+
+  .read-out { font-size: 14px; line-height: 1.6; color: var(--chalk); }
+  .read-out .muted { color: var(--muted); }
+
+  .disclaimer {
+    max-width: 640px;
+    margin: 30px auto 0;
+    padding: 0 20px;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .save-row { display: flex; gap: 10px; margin-top: 14px; }
+
+  .save-row button {
+    flex: 1;
+    background: none;
+    border: 1px solid var(--panel-border);
+    color: var(--muted);
+    padding: 9px;
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .save-row button:hover { color: var(--chalk); border-color: var(--turf-bright); }
+
+  .saved-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+  .saved-chip {
+    background: #0f1210;
+    border: 1px solid var(--panel-border);
+    color: var(--muted);
+    padding: 6px 10px;
+    border-radius: 3px;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .saved-chip:hover { color: var(--chalk); border-color: var(--turf-bright); }
+  .saved-chip .del { color: var(--under); font-weight: 700; }
+
+  /* Auth screen */
+  .auth-wrap {
+    max-width: 420px;
+    margin: 80px auto;
+    padding: 0 20px;
+  }
+
+  .auth-tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+
+  .auth-tabs button {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    color: var(--muted);
+    padding: 10px;
+    border-radius: 3px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .auth-tabs button.active { color: var(--gold); border-color: var(--gold); }
+
+  .hidden { display: none !important; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="yardmarks"></div>
+
+<!-- AUTH SCREEN -->
+<div class="auth-wrap" id="authScreen">
+  <div class="header-text" style="margin-bottom: 24px;">
+    <h1>Prop Line <span>Read</span></h1>
+    <p>Sign in to save your players and pick up where you left off on any device.</p>
+  </div>
+
+  <div class="auth-tabs">
+    <button id="tabLogin" class="active">Log in</button>
+    <button id="tabSignup">Sign up</button>
+  </div>
+
+  <div class="panel">
+    <div class="field">
+      <label for="authEmail">Email</label>
+      <input type="email" id="authEmail" placeholder="you@example.com">
+    </div>
+    <div class="field">
+      <label for="authPassword">Password</label>
+      <input type="password" id="authPassword" placeholder="At least 6 characters">
+    </div>
+    <button class="primary-btn" id="authSubmit">Log in</button>
+    <div class="error-msg" id="authError" style="display:none;"></div>
+    <div class="success-msg" id="authSuccess" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- MAIN APP (shown after login) -->
+<div id="appScreen" class="hidden">
+  <header>
+    <div class="header-text">
+      <h1>Prop Line <span>Read</span></h1>
+      <p>Enter a player's recent stat line and a prop number for a statistical read on how often that number has cleared historically.</p>
+    </div>
+    <div class="account-box">
+      <span class="email" id="userEmail"></span>
+      <button class="link-btn" id="signOutBtn">Sign out</button>
+    </div>
+  </header>
+
+  <main>
+
+    <div class="panel">
+      <h2>Set the line</h2>
+      <div class="field">
+        <label for="playerName">Player</label>
+        <input type="text" id="playerName" placeholder="e.g. Jahmyr Gibbs">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label for="propType">Prop type</label>
+          <select id="propType">
+            <option>Rushing Yards</option>
+            <option>Receiving Yards</option>
+            <option>Receptions</option>
+            <option>Passing Yards</option>
+            <option>Passing TDs</option>
+            <option>Rush + Rec Yards</option>
+            <option>Anytime TD (0/1)</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="lineValue">Line</label>
+          <input type="number" id="lineValue" step="0.5" placeholder="e.g. 74.5">
+        </div>
+      </div>
+      <div class="field">
+        <label>Betting</label>
+        <div class="toggle">
+          <button type="button" id="btnOver" class="active over">Over</button>
+          <button type="button" id="btnUnder" class="under">Under</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Recent performances</h2>
+      <div class="games-list" id="gamesList"></div>
+      <button class="add-game" id="addGame">+ Add a game</button>
+      <button class="calc-btn" id="calcBtn">Calculate read</button>
+      <div class="error-msg" id="errorMsg" style="display:none;"></div>
+
+      <div class="save-row">
+        <button id="saveBtn">Save this player</button>
+        <button id="clearBtn">Clear form</button>
+      </div>
+      <div class="saved-list" id="savedList"></div>
+    </div>
+
+    <div class="panel" id="resultsPanel" style="display:none;">
+      <h2>The read</h2>
+      <div class="result-hero">
+        <div class="call" id="callLine"></div>
+        <div class="pct" id="pctValue">--%</div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-box"><div class="label">Hit rate</div><div class="value" id="hitRate">-</div></div>
+        <div class="stat-box"><div class="label">Average</div><div class="value" id="avgVal">-</div></div>
+        <div class="stat-box"><div class="label">Std dev</div><div class="value" id="stdVal">-</div></div>
+      </div>
+
+      <div class="chart" id="chart"></div>
+      <div class="read-out" id="readOut"></div>
+    </div>
+
+  </main>
+
+  <div class="disclaimer">
+    This tool estimates probability from the games you enter, assuming a roughly normal spread of outcomes. Small sample sizes (fewer than 5-6 games) make these estimates unreliable. It does not account for matchup, injury, weather, game script, or live sportsbook odds. Treat it as one input among many, not a prediction. If betting stops being fun or starts to feel out of control, the National Council on Problem Gambling helpline is 1-800-522-4700.
+  </div>
+</div>
+
+<script>
+  // ---------- Supabase setup ----------
+  const SUPABASE_URL = 'https://nhirnkqiwgcggyixfecg.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5oaXJua3Fpd2djZ2d5aXhmZWNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwODIwNjgsImV4cCI6MjEwNDY1ODA2OH0.ZpKclMwowfvsO7Gh22R_Fbgb93XXZWekhaPpU7689Rg';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let currentUser = null;
+  let authMode = 'login';
+
+  const authScreen = document.getElementById('authScreen');
+  const appScreen = document.getElementById('appScreen');
+  const authError = document.getElementById('authError');
+  const authSuccess = document.getElementById('authSuccess');
+
+  function showAuthMessage(el, msg) {
+    authError.style.display = 'none';
+    authSuccess.style.display = 'none';
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  document.getElementById('tabLogin').addEventListener('click', () => {
+    authMode = 'login';
+    document.getElementById('tabLogin').classList.add('active');
+    document.getElementById('tabSignup').classList.remove('active');
+    document.getElementById('authSubmit').textContent = 'Log in';
+  });
+
+  document.getElementById('tabSignup').addEventListener('click', () => {
+    authMode = 'signup';
+    document.getElementById('tabSignup').classList.add('active');
+    document.getElementById('tabLogin').classList.remove('active');
+    document.getElementById('authSubmit').textContent = 'Sign up';
+  });
+
+  document.getElementById('authSubmit').addEventListener('click', async () => {
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+    if (!email || !password) {
+      showAuthMessage(authError, 'Enter both an email and password.');
+      return;
+    }
+    try {
+      if (authMode === 'signup') {
+        const { data, error } = await sb.auth.signUp({ email, password });
+        if (error) throw error;
+        if (data.user && !data.session) {
+          showAuthMessage(authSuccess, 'Check your email to confirm your account, then log in.');
+        } else {
+          onLogin(data.user);
+        }
+      } else {
+        const { data, error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        onLogin(data.user);
+      }
+    } catch (e) {
+      showAuthMessage(authError, e.message || 'Something went wrong.');
+    }
+  });
+
+  document.getElementById('signOutBtn').addEventListener('click', async () => {
+    await sb.auth.signOut();
+    currentUser = null;
+    appScreen.classList.add('hidden');
+    authScreen.classList.remove('hidden');
+  });
+
+  function onLogin(user) {
+    currentUser = user;
+    document.getElementById('userEmail').textContent = user.email;
+    authScreen.classList.add('hidden');
+    appScreen.classList.remove('hidden');
+    loadSavedList();
+  }
+
+  // Restore session on page load
+  sb.auth.getSession().then(({ data }) => {
+    if (data.session && data.session.user) {
+      onLogin(data.session.user);
+    }
+  });
+
+  // ---------- App logic ----------
+  let overUnder = 'over';
+  let gameCount = 0;
+
+  const gamesList = document.getElementById('gamesList');
+  const btnOver = document.getElementById('btnOver');
+  const btnUnder = document.getElementById('btnUnder');
+
+  function addGameRow(value) {
+    gameCount++;
+    const row = document.createElement('div');
+    row.className = 'game-row';
+    row.innerHTML = `
+      <span class="idx">${gameCount}</span>
+      <input type="number" step="0.5" class="game-input" placeholder="Stat value" value="${value ?? ''}">
+      <button type="button" aria-label="Remove game" class="removeGame">&times;</button>
+    `;
+    gamesList.appendChild(row);
+    row.querySelector('.removeGame').addEventListener('click', () => {
+      row.remove();
+      renumberGames();
+    });
+  }
+
+  function renumberGames() {
+    const rows = gamesList.querySelectorAll('.game-row');
+    gameCount = rows.length;
+    rows.forEach((row, i) => { row.querySelector('.idx').textContent = i + 1; });
+  }
+
+  document.getElementById('addGame').addEventListener('click', () => addGameRow());
+  for (let i = 0; i < 5; i++) addGameRow();
+
+  btnOver.addEventListener('click', () => {
+    overUnder = 'over';
+    btnOver.classList.add('active');
+    btnUnder.classList.remove('active');
+  });
+  btnUnder.addEventListener('click', () => {
+    overUnder = 'under';
+    btnUnder.classList.add('active');
+    btnOver.classList.remove('active');
+  });
+
+  function erf(x) {
+    const sign = x < 0 ? -1 : 1;
+    x = Math.abs(x);
+    const a1 =  0.254829592, a2 = -0.284496736, a3 = 1.421413741;
+    const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+    const t = 1 / (1 + p * x);
+    const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+    return sign * y;
+  }
+  function normalCDF(x, mean, std) {
+    if (std === 0) return x >= mean ? 1 : 0;
+    const z = (x - mean) / (std * Math.SQRT2);
+    return 0.5 * (1 + erf(z));
+  }
+
+  function getGameValues() {
+    return Array.from(document.querySelectorAll('.game-input'))
+      .map(i => parseFloat(i.value))
+      .filter(v => !isNaN(v));
+  }
+
+  document.getElementById('calcBtn').addEventListener('click', () => {
+    const errorMsg = document.getElementById('errorMsg');
+    const line = parseFloat(document.getElementById('lineValue').value);
+    const values = getGameValues();
+
+    if (isNaN(line)) {
+      errorMsg.textContent = 'Enter a line value first.';
+      errorMsg.style.display = 'block';
+      return;
+    }
+    if (values.length < 2) {
+      errorMsg.textContent = 'Enter at least 2 games of data.';
+      errorMsg.style.display = 'block';
+      return;
+    }
+    errorMsg.style.display = 'none';
+
+    const n = values.length;
+    const mean = values.reduce((a, b) => a + b, 0) / n;
+    const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1);
+    const std = Math.sqrt(variance);
+
+    const hits = overUnder === 'over' ? values.filter(v => v > line).length : values.filter(v => v < line).length;
+    const hitRate = hits / n;
+
+    const probOver = 1 - normalCDF(line, mean, std);
+    const prob = overUnder === 'over' ? probOver : 1 - probOver;
+
+    const player = document.getElementById('playerName').value.trim() || 'This player';
+    const propType = document.getElementById('propType').value;
+
+    document.getElementById('callLine').textContent = `${player} — ${propType} ${overUnder === 'over' ? 'over' : 'under'} ${line}`;
+
+    const pctEl = document.getElementById('pctValue');
+    pctEl.textContent = `${Math.round(prob * 100)}%`;
+    pctEl.className = 'pct ' + overUnder;
+
+    document.getElementById('hitRate').textContent = `${hits}/${n} games`;
+    document.getElementById('avgVal').textContent = mean.toFixed(1);
+    document.getElementById('stdVal').textContent = std.toFixed(1);
+
+    const chart = document.getElementById('chart');
+    chart.innerHTML = '';
+    const maxVal = Math.max(...values, line) * 1.15;
+    const linePct = (line / maxVal) * 100;
+    const lineMarker = document.createElement('div');
+    lineMarker.className = 'line-marker';
+    lineMarker.style.bottom = linePct + '%';
+    const lineLabel = document.createElement('div');
+    lineLabel.className = 'line-label';
+    lineLabel.textContent = `line ${line}`;
+    lineMarker.appendChild(lineLabel);
+    chart.appendChild(lineMarker);
+
+    values.forEach((v) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'bar-wrap';
+      const bar = document.createElement('div');
+      const cleared = overUnder === 'over' ? v > line : v < line;
+      bar.className = 'bar ' + (cleared ? 'over-line' : 'under-line');
+      bar.style.height = Math.max((v / maxVal) * 100, 2) + '%';
+      const num = document.createElement('div');
+      num.className = 'bar-num';
+      num.textContent = v;
+      wrap.appendChild(bar);
+      wrap.appendChild(num);
+      chart.appendChild(wrap);
+    });
+
+    const readOut = document.getElementById('readOut');
+    let confidence = n < 4 ? 'Sample is thin, so treat this as a rough sketch, not a firm read.' :
+      n < 8 ? 'Sample is moderate — the read is reasonable but still noisy.' :
+      'Sample size gives a steadier read than a handful of games would.';
+    readOut.innerHTML = `Over the last <strong>${n}</strong> games, ${player} landed on this stat an average of <strong>${mean.toFixed(1)}</strong>, clearing <strong>${overUnder}</strong> ${line} in <strong>${hits} of ${n}</strong> outings (${Math.round(hitRate*100)}%). Assuming a normal spread around that average, the statistical estimate lands at <strong>${Math.round(prob*100)}%</strong>. <span class="muted">${confidence}</span>`;
+
+    document.getElementById('resultsPanel').style.display = 'block';
+    document.getElementById('resultsPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    document.getElementById('playerName').value = '';
+    document.getElementById('lineValue').value = '';
+    gamesList.innerHTML = '';
+    gameCount = 0;
+    for (let i = 0; i < 5; i++) addGameRow();
+    document.getElementById('resultsPanel').style.display = 'none';
+  });
+
+  // ---------- Cloud save/load (Supabase) ----------
+  async function loadSavedList() {
+    const savedList = document.getElementById('savedList');
+    savedList.innerHTML = '';
+    const { data, error } = await sb
+      .from('prop_players')
+      .select('*')
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      console.error('Load error', error);
+      return;
+    }
+
+    (data || []).forEach(row => {
+      const chip = document.createElement('div');
+      chip.className = 'saved-chip';
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = row.name;
+      nameSpan.style.cursor = 'pointer';
+      nameSpan.addEventListener('click', () => loadPlayer(row));
+      const del = document.createElement('span');
+      del.className = 'del';
+      del.textContent = '×';
+      del.style.cursor = 'pointer';
+      del.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await sb.from('prop_players').delete().eq('id', row.id);
+        loadSavedList();
+      });
+      chip.appendChild(nameSpan);
+      chip.appendChild(del);
+      savedList.appendChild(chip);
+    });
+  }
+
+  function loadPlayer(row) {
+    document.getElementById('playerName').value = row.name || '';
+    document.getElementById('propType').value = row.prop_type || 'Rushing Yards';
+    document.getElementById('lineValue').value = row.line ?? '';
+    overUnder = row.over_under || 'over';
+    if (overUnder === 'over') { btnOver.click(); } else { btnUnder.click(); }
+    gamesList.innerHTML = '';
+    gameCount = 0;
+    const vals = row.game_values && row.game_values.length ? row.game_values : ['', '', '', '', ''];
+    vals.forEach(v => addGameRow(v));
+  }
+
+  document.getElementById('saveBtn').addEventListener('click', async () => {
+    const errorMsg = document.getElementById('errorMsg');
+    const name = document.getElementById('playerName').value.trim();
+    if (!name) {
+      errorMsg.textContent = 'Enter a player name before saving.';
+      errorMsg.style.display = 'block';
+      return;
+    }
+    const payload = {
+      user_id: currentUser.id,
+      name,
+      prop_type: document.getElementById('propType').value,
+      line: parseFloat(document.getElementById('lineValue').value) || null,
+      over_under: overUnder,
+      game_values: getGameValues(),
+      updated_at: new Date().toISOString()
+    };
+    const { error } = await sb.from('prop_players').upsert(payload, { onConflict: 'user_id,name' });
+    if (error) {
+      errorMsg.textContent = 'Save failed: ' + error.message;
+      errorMsg.style.display = 'block';
+      return;
+    }
+    errorMsg.style.display = 'none';
+    loadSavedList();
+  });
+</script>
+
+</body>
+</html>
