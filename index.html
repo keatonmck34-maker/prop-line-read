@@ -115,7 +115,7 @@
     font-size: 13px;
     font-weight: 600;
     color: var(--turf-bright);
-    margin: 0 0 16px;
+    margin: 0 0 4px;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -128,6 +128,13 @@
     background: var(--gold);
     border-radius: 50%;
     flex-shrink: 0;
+  }
+
+  .panel .subnote {
+    font-size: 12px;
+    color: var(--muted);
+    margin: 0 0 16px;
+    padding-left: 14px;
   }
 
   .field {
@@ -227,7 +234,6 @@
     font-family: inherit;
     font-size: 14px;
     cursor: pointer;
-    margin-bottom: 14px;
   }
 
   .add-game:hover { border-color: var(--turf-bright); }
@@ -259,9 +265,11 @@
   }
 
   .result-hero .call { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  .result-hero .pct-row { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
   .result-hero .pct { font-family: 'Anton', sans-serif; font-size: clamp(52px, 14vw, 76px); line-height: 0.9; }
   .result-hero .pct.over { color: var(--turf-bright); }
   .result-hero .pct.under { color: var(--under); }
+  .result-hero .baseline-note { font-size: 13px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
 
   .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
 
@@ -279,8 +287,22 @@
   .bar.under-line { background: var(--under); }
   .bar-num { font-size: 10px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
 
-  .read-out { font-size: 14px; line-height: 1.6; color: var(--chalk); }
+  .read-out { font-size: 14px; line-height: 1.6; color: var(--chalk); margin-bottom: 18px; }
   .read-out .muted { color: var(--muted); }
+
+  .breakdown { border-top: 1px solid var(--panel-border); padding-top: 14px; }
+  .breakdown .bd-title { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .bd-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 6px 0;
+    border-bottom: 1px solid #23281c;
+  }
+  .bd-row:last-child { border-bottom: none; }
+  .bd-row .amt.pos { color: var(--turf-bright); }
+  .bd-row .amt.neg { color: var(--under); }
+  .bd-row .amt.zero { color: var(--muted); }
 
   .disclaimer {
     max-width: 640px;
@@ -436,8 +458,79 @@
 
     <div class="panel">
       <h2>Recent performances</h2>
+      <div class="subnote">Enter this stat from the player's last several games.</div>
       <div class="games-list" id="gamesList"></div>
       <button class="add-game" id="addGame">+ Add a game</button>
+    </div>
+
+    <div class="panel">
+      <h2>Matchup adjustments</h2>
+      <div class="subnote">Optional. Ask me for these numbers each week, or fill them in yourself — leave any at the neutral/default option to skip it.</div>
+
+      <div class="row2">
+        <div class="field">
+          <label for="defRank">Opponent rank vs this stat (1 = toughest, 32 = easiest)</label>
+          <input type="number" id="defRank" min="1" max="32" placeholder="e.g. 16 (leave blank to skip)">
+        </div>
+        <div class="field">
+          <label for="locationSel">Location</label>
+          <select id="locationSel">
+            <option value="home">Home</option>
+            <option value="away">Away</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="gameScriptSel">Game script (spread)</label>
+        <select id="gameScriptSel">
+          <option value="0">Pick'em / even</option>
+          <option value="1">Slight favorite (-1 to -6.5)</option>
+          <option value="2">Big favorite (-7 or more)</option>
+          <option value="-1">Slight underdog (+1 to +6.5)</option>
+          <option value="-2">Big underdog (+7 or more)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="weatherSel">Weather</label>
+        <select id="weatherSel">
+          <option value="good">Good conditions / dome</option>
+          <option value="wind">Windy</option>
+          <option value="wet">Rain or snow</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="healthSel">This player's health</label>
+        <select id="healthSel">
+          <option value="full">Full health</option>
+          <option value="minor">Playing through a minor injury</option>
+          <option value="limited">Limited in practice this week</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="teammateSel">Notable teammate absence</label>
+        <select id="teammateSel">
+          <option value="none">No notable absences</option>
+          <option value="backfield">Backfield committee mate out</option>
+          <option value="target">Top receiving target out</option>
+          <option value="oline">Key O-line starter out</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="trendSel">Recent trend (last 3 games vs. season average)</label>
+        <select id="trendSel">
+          <option value="normal">Normal</option>
+          <option value="hot">Hot streak</option>
+          <option value="cold">Cold stretch</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="panel">
       <button class="calc-btn" id="calcBtn">Calculate read</button>
       <div class="error-msg" id="errorMsg" style="display:none;"></div>
 
@@ -452,7 +545,10 @@
       <h2>The read</h2>
       <div class="result-hero">
         <div class="call" id="callLine"></div>
-        <div class="pct" id="pctValue">--%</div>
+        <div class="pct-row">
+          <div class="pct" id="pctValue">--%</div>
+          <div class="baseline-note" id="baselineNote"></div>
+        </div>
       </div>
 
       <div class="stat-grid">
@@ -463,12 +559,17 @@
 
       <div class="chart" id="chart"></div>
       <div class="read-out" id="readOut"></div>
+
+      <div class="breakdown" id="breakdownSection" style="display:none;">
+        <div class="bd-title">Matchup adjustments applied</div>
+        <div id="breakdownList"></div>
+      </div>
     </div>
 
   </main>
 
   <div class="disclaimer">
-    This tool estimates probability from the games you enter, assuming a roughly normal spread of outcomes. Small sample sizes (fewer than 5-6 games) make these estimates unreliable. It does not account for matchup, injury, weather, game script, or live sportsbook odds. Treat it as one input among many, not a prediction. If betting stops being fun or starts to feel out of control, the National Council on Problem Gambling helpline is 1-800-522-4700.
+    This tool estimates probability from the games and matchup factors you enter. The matchup adjustments use reasonable football logic (defense strength, game script, weather, injuries, home/away, recent trend) but are not a statistically fitted or backtested model — treat the weights as directional, not precise. Small sample sizes (fewer than 5-6 games) make the underlying read unreliable regardless of adjustments. This does not access live sportsbook odds. Treat it as one input among many, not a prediction. If betting stops being fun or starts to feel out of control, the National Council on Problem Gambling helpline is 1-800-522-4700.
   </div>
 </div>
 
@@ -548,7 +649,6 @@
     loadSavedList();
   }
 
-  // Restore session on page load
   sb.auth.getSession().then(({ data }) => {
     if (data.session && data.session.user) {
       onLogin(data.session.user);
@@ -620,6 +720,92 @@
       .filter(v => !isNaN(v));
   }
 
+  function propCategory(propType) {
+    if (propType === 'Rushing Yards') return 'rush';
+    if (propType === 'Receiving Yards' || propType === 'Receptions') return 'rec';
+    if (propType === 'Passing Yards' || propType === 'Passing TDs') return 'pass';
+    if (propType === 'Rush + Rec Yards') return 'rushrec';
+    if (propType === 'Anytime TD (0/1)') return 'td';
+    return 'other';
+  }
+
+  // Returns { totalPct, factors: [{label, pct}] } -- only non-zero factors included
+  function computeMatchupAdjustment(propType) {
+    const cat = propCategory(propType);
+    const factors = [];
+
+    // Defense rank
+    const rankRaw = document.getElementById('defRank').value;
+    if (rankRaw !== '') {
+      const rank = Math.max(1, Math.min(32, parseFloat(rankRaw)));
+      const pct = (rank - 16.5) / 16.5 * 0.12;
+      factors.push({ label: `Opponent rank vs stat (${rank})`, pct });
+    }
+
+    // Location
+    const location = document.getElementById('locationSel').value;
+    const locPct = location === 'home' ? 0.03 : -0.03;
+    factors.push({ label: location === 'home' ? 'Home game' : 'Away game', pct: locPct });
+
+    // Game script
+    const script = parseFloat(document.getElementById('gameScriptSel').value);
+    if (script !== 0) {
+      let scriptPct = 0;
+      if (cat === 'rush' || cat === 'rushrec') scriptPct = script * 0.035;
+      else if (cat === 'pass' || cat === 'rec') scriptPct = -script * 0.035;
+      if (scriptPct !== 0) {
+        const label = script > 0 ? (script === 2 ? 'Big favorite' : 'Slight favorite') : (script === -2 ? 'Big underdog' : 'Slight underdog');
+        factors.push({ label: `Game script: ${label}`, pct: scriptPct });
+      }
+    }
+
+    // Weather
+    const weather = document.getElementById('weatherSel').value;
+    if (weather !== 'good') {
+      let wPct = 0;
+      if (weather === 'wind') {
+        if (cat === 'pass' || cat === 'rec') wPct = -0.10;
+        else if (cat === 'rush' || cat === 'rushrec') wPct = 0.03;
+        else if (cat === 'td') wPct = -0.03;
+      } else if (weather === 'wet') {
+        if (cat === 'pass' || cat === 'rec') wPct = -0.08;
+        else if (cat === 'rush' || cat === 'rushrec') wPct = 0.05;
+        else if (cat === 'td') wPct = -0.03;
+      }
+      if (wPct !== 0) factors.push({ label: weather === 'wind' ? 'Windy conditions' : 'Rain or snow', pct: wPct });
+    }
+
+    // Player health
+    const health = document.getElementById('healthSel').value;
+    if (health !== 'full') {
+      const hPct = health === 'minor' ? -0.08 : -0.05;
+      factors.push({ label: health === 'minor' ? 'Playing through minor injury' : 'Limited in practice', pct: hPct });
+    }
+
+    // Teammate absence
+    const teammate = document.getElementById('teammateSel').value;
+    if (teammate !== 'none') {
+      let tPct = 0;
+      let label = '';
+      if (teammate === 'backfield' && (cat === 'rush' || cat === 'rushrec' || cat === 'td')) { tPct = 0.10; label = 'Backfield committee mate out'; }
+      if (teammate === 'target' && (cat === 'rec' || cat === 'pass' || cat === 'td')) { tPct = 0.10; label = 'Top receiving target out'; }
+      if (teammate === 'oline') { tPct = cat === 'td' ? -0.05 : -0.08; label = 'Key O-line starter out'; }
+      if (tPct !== 0) factors.push({ label, pct: tPct });
+    }
+
+    // Recent trend
+    const trend = document.getElementById('trendSel').value;
+    if (trend !== 'normal') {
+      const trPct = trend === 'hot' ? 0.06 : -0.06;
+      factors.push({ label: trend === 'hot' ? 'Hot streak (last 3 games)' : 'Cold stretch (last 3 games)', pct: trPct });
+    }
+
+    let totalPct = factors.reduce((a, f) => a + f.pct, 0);
+    totalPct = Math.max(-0.35, Math.min(0.35, totalPct));
+
+    return { totalPct, factors };
+  }
+
   document.getElementById('calcBtn').addEventListener('click', () => {
     const errorMsg = document.getElementById('errorMsg');
     const line = parseFloat(document.getElementById('lineValue').value);
@@ -645,17 +831,30 @@
     const hits = overUnder === 'over' ? values.filter(v => v > line).length : values.filter(v => v < line).length;
     const hitRate = hits / n;
 
-    const probOver = 1 - normalCDF(line, mean, std);
-    const prob = overUnder === 'over' ? probOver : 1 - probOver;
+    const propType = document.getElementById('propType').value;
+    const { totalPct, factors } = computeMatchupAdjustment(propType);
+    const adjustedMean = mean * (1 + totalPct);
+
+    const baselineProbOver = 1 - normalCDF(line, mean, std);
+    const baselineProb = overUnder === 'over' ? baselineProbOver : 1 - baselineProbOver;
+
+    const adjProbOver = 1 - normalCDF(line, adjustedMean, std);
+    const adjProb = overUnder === 'over' ? adjProbOver : 1 - adjProbOver;
 
     const player = document.getElementById('playerName').value.trim() || 'This player';
-    const propType = document.getElementById('propType').value;
 
     document.getElementById('callLine').textContent = `${player} — ${propType} ${overUnder === 'over' ? 'over' : 'under'} ${line}`;
 
     const pctEl = document.getElementById('pctValue');
-    pctEl.textContent = `${Math.round(prob * 100)}%`;
+    pctEl.textContent = `${Math.round(adjProb * 100)}%`;
     pctEl.className = 'pct ' + overUnder;
+
+    const baselineNote = document.getElementById('baselineNote');
+    if (Math.abs(totalPct) > 0.001) {
+      baselineNote.textContent = `history alone: ${Math.round(baselineProb * 100)}%`;
+    } else {
+      baselineNote.textContent = '';
+    }
 
     document.getElementById('hitRate').textContent = `${hits}/${n} games`;
     document.getElementById('avgVal').textContent = mean.toFixed(1);
@@ -693,7 +892,26 @@
     let confidence = n < 4 ? 'Sample is thin, so treat this as a rough sketch, not a firm read.' :
       n < 8 ? 'Sample is moderate — the read is reasonable but still noisy.' :
       'Sample size gives a steadier read than a handful of games would.';
-    readOut.innerHTML = `Over the last <strong>${n}</strong> games, ${player} landed on this stat an average of <strong>${mean.toFixed(1)}</strong>, clearing <strong>${overUnder}</strong> ${line} in <strong>${hits} of ${n}</strong> outings (${Math.round(hitRate*100)}%). Assuming a normal spread around that average, the statistical estimate lands at <strong>${Math.round(prob*100)}%</strong>. <span class="muted">${confidence}</span>`;
+    let matchupNote = Math.abs(totalPct) > 0.001
+      ? ` Matchup factors shifted the expected performance by ${totalPct > 0 ? '+' : ''}${Math.round(totalPct*100)}%, moving the estimate from ${Math.round(baselineProb*100)}% to ${Math.round(adjProb*100)}%.`
+      : '';
+    readOut.innerHTML = `Over the last <strong>${n}</strong> games, ${player} landed on this stat an average of <strong>${mean.toFixed(1)}</strong>, clearing <strong>${overUnder}</strong> ${line} in <strong>${hits} of ${n}</strong> outings (${Math.round(hitRate*100)}%).${matchupNote} <span class="muted">${confidence}</span>`;
+
+    const breakdownSection = document.getElementById('breakdownSection');
+    const breakdownList = document.getElementById('breakdownList');
+    breakdownList.innerHTML = '';
+    if (factors.length > 0) {
+      factors.forEach(f => {
+        const row = document.createElement('div');
+        row.className = 'bd-row';
+        const cls = f.pct > 0 ? 'pos' : f.pct < 0 ? 'neg' : 'zero';
+        row.innerHTML = `<span>${f.label}</span><span class="amt ${cls}">${f.pct > 0 ? '+' : ''}${Math.round(f.pct*100)}%</span>`;
+        breakdownList.appendChild(row);
+      });
+      breakdownSection.style.display = 'block';
+    } else {
+      breakdownSection.style.display = 'none';
+    }
 
     document.getElementById('resultsPanel').style.display = 'block';
     document.getElementById('resultsPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -702,6 +920,13 @@
   document.getElementById('clearBtn').addEventListener('click', () => {
     document.getElementById('playerName').value = '';
     document.getElementById('lineValue').value = '';
+    document.getElementById('defRank').value = '';
+    document.getElementById('locationSel').value = 'home';
+    document.getElementById('gameScriptSel').value = '0';
+    document.getElementById('weatherSel').value = 'good';
+    document.getElementById('healthSel').value = 'full';
+    document.getElementById('teammateSel').value = 'none';
+    document.getElementById('trendSel').value = 'normal';
     gamesList.innerHTML = '';
     gameCount = 0;
     for (let i = 0; i < 5; i++) addGameRow();
