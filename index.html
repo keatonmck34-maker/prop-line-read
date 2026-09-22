@@ -157,7 +157,7 @@
     gap: 14px;
   }
 
-  input[type="text"], input[type="number"], input[type="email"], input[type="password"], select {
+  input[type="text"], input[type="number"], input[type="email"], input[type="password"], input[type="date"], select {
     background: #0f1210;
     border: 1px solid var(--panel-border);
     color: var(--chalk);
@@ -465,7 +465,35 @@
 
     <div class="panel">
       <h2>Matchup adjustments</h2>
-      <div class="subnote">Optional. Ask me for these numbers each week, or fill them in yourself — leave any at the neutral/default option to skip it.</div>
+      <div class="subnote">Fill in the game details and auto-fill what we can, or enter everything manually &mdash; leave any field at the neutral/default option to skip it.</div>
+
+      <div class="row2">
+        <div class="field">
+          <label for="teamSel">Player's team</label>
+          <select id="teamSel">
+            <option value="ARI">Arizona Cardinals</option><option value="ATL">Atlanta Falcons</option><option value="BAL">Baltimore Ravens</option><option value="BUF">Buffalo Bills</option><option value="CAR">Carolina Panthers</option><option value="CHI">Chicago Bears</option><option value="CIN">Cincinnati Bengals</option><option value="CLE">Cleveland Browns</option><option value="DAL">Dallas Cowboys</option><option value="DEN">Denver Broncos</option><option value="DET">Detroit Lions</option><option value="GB">Green Bay Packers</option><option value="HOU">Houston Texans</option><option value="IND">Indianapolis Colts</option><option value="JAX">Jacksonville Jaguars</option><option value="KC">Kansas City Chiefs</option><option value="LV">Las Vegas Raiders</option><option value="LAC">Los Angeles Chargers</option><option value="LAR">Los Angeles Rams</option><option value="MIA">Miami Dolphins</option><option value="MIN">Minnesota Vikings</option><option value="NE">New England Patriots</option><option value="NO">New Orleans Saints</option><option value="NYG">New York Giants</option><option value="NYJ">New York Jets</option><option value="PHI">Philadelphia Eagles</option><option value="PIT">Pittsburgh Steelers</option><option value="SF">San Francisco 49ers</option><option value="SEA">Seattle Seahawks</option><option value="TB">Tampa Bay Buccaneers</option><option value="TEN">Tennessee Titans</option><option value="WSH">Washington Commanders</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="oppSel">Opponent</label>
+          <select id="oppSel">
+            <option value="ARI">Arizona Cardinals</option><option value="ATL">Atlanta Falcons</option><option value="BAL">Baltimore Ravens</option><option value="BUF">Buffalo Bills</option><option value="CAR">Carolina Panthers</option><option value="CHI">Chicago Bears</option><option value="CIN">Cincinnati Bengals</option><option value="CLE">Cleveland Browns</option><option value="DAL">Dallas Cowboys</option><option value="DEN">Denver Broncos</option><option value="DET">Detroit Lions</option><option value="GB">Green Bay Packers</option><option value="HOU">Houston Texans</option><option value="IND">Indianapolis Colts</option><option value="JAX">Jacksonville Jaguars</option><option value="KC">Kansas City Chiefs</option><option value="LV">Las Vegas Raiders</option><option value="LAC">Los Angeles Chargers</option><option value="LAR">Los Angeles Rams</option><option value="MIA">Miami Dolphins</option><option value="MIN">Minnesota Vikings</option><option value="NE">New England Patriots</option><option value="NO">New Orleans Saints</option><option value="NYG">New York Giants</option><option value="NYJ">New York Jets</option><option value="PHI">Philadelphia Eagles</option><option value="PIT">Pittsburgh Steelers</option><option value="SF">San Francisco 49ers</option><option value="SEA">Seattle Seahawks</option><option value="TB">Tampa Bay Buccaneers</option><option value="TEN">Tennessee Titans</option><option value="WSH">Washington Commanders</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label for="gameDateInput">Game date</label>
+          <input type="date" id="gameDateInput">
+        </div>
+        <div class="field">
+          <label>&nbsp;</label>
+          <button type="button" class="primary-btn" id="autoFillBtn" style="padding: 10px;">Auto-fill from live data</button>
+        </div>
+      </div>
+      <div class="error-msg" id="autoFillError" style="display:none;"></div>
+      <div class="success-msg" id="autoFillNote" style="display:none;"></div>
 
       <div class="row2">
         <div class="field">
@@ -569,7 +597,7 @@
   </main>
 
   <div class="disclaimer">
-    This tool estimates probability from the games and matchup factors you enter. The matchup adjustments use reasonable football logic (defense strength, game script, weather, injuries, home/away, recent trend) but are not a statistically fitted or backtested model — treat the weights as directional, not precise. Small sample sizes (fewer than 5-6 games) make the underlying read unreliable regardless of adjustments. This does not access live sportsbook odds. Treat it as one input among many, not a prediction. If betting stops being fun or starts to feel out of control, the National Council on Problem Gambling helpline is 1-800-522-4700.
+    This tool estimates probability from the games and matchup factors you enter. The matchup adjustments use reasonable football logic (defense strength, game script, weather, injuries, home/away, recent trend) but are not a statistically fitted or backtested model &mdash; treat the weights as directional, not precise. The auto-fill feature pulls from an unofficial, undocumented data source and can occasionally be wrong or unavailable — always sanity-check it. Small sample sizes (fewer than 5-6 games) make the underlying read unreliable regardless of adjustments. This does not access live sportsbook odds. Treat it as one input among many, not a prediction. If betting stops being fun or starts to feel out of control, the National Council on Problem Gambling helpline is 1-800-522-4700.
   </div>
 </div>
 
@@ -699,6 +727,73 @@
     btnOver.classList.remove('active');
   });
 
+  document.getElementById('autoFillBtn').addEventListener('click', async () => {
+    const errEl = document.getElementById('autoFillError');
+    const noteEl = document.getElementById('autoFillNote');
+    errEl.style.display = 'none';
+    noteEl.style.display = 'none';
+
+    const team = document.getElementById('teamSel').value;
+    const opponent = document.getElementById('oppSel').value;
+    const gameDate = document.getElementById('gameDateInput').value;
+    const propType = document.getElementById('propType').value;
+    const playerName = document.getElementById('playerName').value.trim();
+
+    if (!gameDate) {
+      errEl.textContent = 'Pick a game date first.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    const btn = document.getElementById('autoFillBtn');
+    const originalText = btn.textContent;
+    btn.textContent = 'Pulling data…';
+    btn.disabled = true;
+
+    try {
+      const { data, error } = await sb.functions.invoke('matchup-data', {
+        body: { team, opponent, gameDate, propType, playerName }
+      });
+      if (error) throw error;
+
+      const notes = [];
+
+      if (data.weather) {
+        document.getElementById('weatherSel').value = data.weather.condition;
+        notes.push(`Weather: ${data.weather.note}`);
+      }
+      if (data.defense) {
+        if (data.defense.rank != null) {
+          document.getElementById('defRank').value = data.defense.rank;
+        }
+        notes.push(`Defense: ${data.defense.note}`);
+      }
+      if (data.injuries) {
+        document.getElementById('healthSel').value = data.injuries.health;
+        document.getElementById('teammateSel').value = data.injuries.teammate;
+        notes.push(`Injuries: ${data.injuries.note}`);
+      }
+
+      noteEl.innerHTML = notes.join('<br>') + '<br><span class="muted">Double-check these against what you know — this pulls from an unofficial source and can be wrong or stale.</span>';
+      noteEl.style.display = 'block';
+    } catch (e) {
+      errEl.textContent = 'Auto-fill failed: ' + (e.message || 'unknown error') + '. Enter the matchup details manually below.';
+      errEl.style.display = 'block';
+    } finally {
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }
+  });
+
+  function propCategory(propType) {
+    if (propType === 'Rushing Yards') return 'rush';
+    if (propType === 'Receiving Yards' || propType === 'Receptions') return 'rec';
+    if (propType === 'Passing Yards' || propType === 'Passing TDs') return 'pass';
+    if (propType === 'Rush + Rec Yards') return 'rushrec';
+    if (propType === 'Anytime TD (0/1)') return 'td';
+    return 'other';
+  }
+
   function erf(x) {
     const sign = x < 0 ? -1 : 1;
     x = Math.abs(x);
@@ -720,21 +815,11 @@
       .filter(v => !isNaN(v));
   }
 
-  function propCategory(propType) {
-    if (propType === 'Rushing Yards') return 'rush';
-    if (propType === 'Receiving Yards' || propType === 'Receptions') return 'rec';
-    if (propType === 'Passing Yards' || propType === 'Passing TDs') return 'pass';
-    if (propType === 'Rush + Rec Yards') return 'rushrec';
-    if (propType === 'Anytime TD (0/1)') return 'td';
-    return 'other';
-  }
-
   // Returns { totalPct, factors: [{label, pct}] } -- only non-zero factors included
   function computeMatchupAdjustment(propType) {
     const cat = propCategory(propType);
     const factors = [];
 
-    // Defense rank
     const rankRaw = document.getElementById('defRank').value;
     if (rankRaw !== '') {
       const rank = Math.max(1, Math.min(32, parseFloat(rankRaw)));
@@ -742,12 +827,10 @@
       factors.push({ label: `Opponent rank vs stat (${rank})`, pct });
     }
 
-    // Location
     const location = document.getElementById('locationSel').value;
     const locPct = location === 'home' ? 0.03 : -0.03;
     factors.push({ label: location === 'home' ? 'Home game' : 'Away game', pct: locPct });
 
-    // Game script
     const script = parseFloat(document.getElementById('gameScriptSel').value);
     if (script !== 0) {
       let scriptPct = 0;
@@ -759,7 +842,6 @@
       }
     }
 
-    // Weather
     const weather = document.getElementById('weatherSel').value;
     if (weather !== 'good') {
       let wPct = 0;
@@ -775,14 +857,12 @@
       if (wPct !== 0) factors.push({ label: weather === 'wind' ? 'Windy conditions' : 'Rain or snow', pct: wPct });
     }
 
-    // Player health
     const health = document.getElementById('healthSel').value;
     if (health !== 'full') {
       const hPct = health === 'minor' ? -0.08 : -0.05;
       factors.push({ label: health === 'minor' ? 'Playing through minor injury' : 'Limited in practice', pct: hPct });
     }
 
-    // Teammate absence
     const teammate = document.getElementById('teammateSel').value;
     if (teammate !== 'none') {
       let tPct = 0;
@@ -793,7 +873,6 @@
       if (tPct !== 0) factors.push({ label, pct: tPct });
     }
 
-    // Recent trend
     const trend = document.getElementById('trendSel').value;
     if (trend !== 'normal') {
       const trPct = trend === 'hot' ? 0.06 : -0.06;
@@ -927,6 +1006,7 @@
     document.getElementById('healthSel').value = 'full';
     document.getElementById('teammateSel').value = 'none';
     document.getElementById('trendSel').value = 'normal';
+    document.getElementById('gameDateInput').value = '';
     gamesList.innerHTML = '';
     gameCount = 0;
     for (let i = 0; i < 5; i++) addGameRow();
