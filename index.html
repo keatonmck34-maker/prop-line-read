@@ -157,7 +157,7 @@
     gap: 14px;
   }
 
-  input[type="text"], input[type="number"], input[type="email"], input[type="password"], input[type="date"], select {
+  input[type="text"], input[type="number"], input[type="email"], input[type="password"], select {
     background: #0f1210;
     border: 1px solid var(--panel-border);
     color: var(--chalk);
@@ -270,6 +270,26 @@
   .result-hero .pct.over { color: var(--turf-bright); }
   .result-hero .pct.under { color: var(--under); }
   .result-hero .baseline-note { font-size: 13px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+
+  .gauge-wrap {
+    text-align: center;
+    margin-bottom: 18px;
+  }
+  .gauge-svg {
+    width: 100%;
+    max-width: 280px;
+    height: auto;
+  }
+  .gauge-verdict {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: -8px;
+    letter-spacing: 0.5px;
+  }
+  .gauge-verdict.take { color: var(--turf-bright); }
+  .gauge-verdict.fade { color: var(--under); }
+  .gauge-verdict.toss { color: var(--muted); }
 
   .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
 
@@ -458,7 +478,7 @@
 
     <div class="panel">
       <h2>Recent performances</h2>
-      <div class="subnote">Enter this stat from the player's last several games.</div>
+      <div class="subnote">Enter this stat from the player's last several games, or use auto-fill below.</div>
       <div class="games-list" id="gamesList"></div>
       <button class="add-game" id="addGame">+ Add a game</button>
     </div>
@@ -579,6 +599,11 @@
         </div>
       </div>
 
+      <div class="gauge-wrap">
+        <svg id="gaugeSvg" viewBox="0 0 200 115" class="gauge-svg"></svg>
+        <div class="gauge-verdict" id="gaugeVerdict"></div>
+      </div>
+
       <div class="stat-grid">
         <div class="stat-box"><div class="label">Hit rate</div><div class="value" id="hitRate">-</div></div>
         <div class="stat-box"><div class="label">Average</div><div class="value" id="avgVal">-</div></div>
@@ -597,7 +622,7 @@
   </main>
 
   <div class="disclaimer">
-    This tool estimates probability from the games and matchup factors you enter. The matchup adjustments use reasonable football logic (defense strength, game script, weather, injuries, home/away, recent trend) but are not a statistically fitted or backtested model &mdash; treat the weights as directional, not precise. The auto-fill feature pulls from an unofficial, undocumented data source and can occasionally be wrong or unavailable — always sanity-check it. Small sample sizes (fewer than 5-6 games) make the underlying read unreliable regardless of adjustments. This does not access live sportsbook odds. Treat it as one input among many, not a prediction. If betting stops being fun or starts to feel out of control, the National Council on Problem Gambling helpline is 1-800-522-4700.
+    This tool estimates probability from the games and matchup factors you enter. The matchup adjustments use reasonable football logic (defense strength, game script, weather, injuries, home/away, recent trend) but are not a statistically fitted or backtested model &mdash; treat the weights as directional, not precise. Small sample sizes (fewer than 5-6 games) make the underlying read unreliable regardless of adjustments. This does not access live sportsbook odds. Treat it as one input among many, not a prediction. If betting stops being fun or starts to feel out of control, the National Council on Problem Gambling helpline is 1-800-522-4700.
   </div>
 </div>
 
@@ -727,6 +752,68 @@
     btnOver.classList.remove('active');
   });
 
+  function erf(x) {
+    const sign = x < 0 ? -1 : 1;
+    x = Math.abs(x);
+    const a1 =  0.254829592, a2 = -0.284496736, a3 = 1.421413741;
+    const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+    const t = 1 / (1 + p * x);
+    const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+    return sign * y;
+  }
+  function normalCDF(x, mean, std) {
+    if (std === 0) return x >= mean ? 1 : 0;
+    const z = (x - mean) / (std * Math.SQRT2);
+    return 0.5 * (1 + erf(z));
+  }
+
+  function getGameValues() {
+    return Array.from(document.querySelectorAll('.game-input'))
+      .map(i => parseFloat(i.value))
+      .filter(v => !isNaN(v));
+  }
+
+  function polarToCartesian(cx, cy, r, angleDeg) {
+    const rad = (angleDeg - 180) * Math.PI / 180;
+    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+  }
+  function describeArc(cx, cy, r, startAngle, endAngle) {
+    const start = polarToCartesian(cx, cy, r, endAngle);
+    const end = polarToCartesian(cx, cy, r, startAngle);
+    const largeArc = endAngle - startAngle <= 180 ? 0 : 1;
+    return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 0 ${end.x} ${end.y}`;
+  }
+
+  function drawGauge(pct) {
+    const svg = document.getElementById('gaugeSvg');
+    const cx = 100, cy = 100, r = 80;
+    const zones = [
+      { from: 0, to: 45, color: 'var(--under)' },
+      { from: 45, to: 55, color: 'var(--muted)' },
+      { from: 55, to: 100, color: 'var(--turf-bright)' },
+    ];
+    let paths = '';
+    zones.forEach(z => {
+      const a1 = (z.from / 100) * 180;
+      const a2 = (z.to / 100) * 180;
+      paths += `<path d="${describeArc(cx, cy, r, a1, a2)}" stroke="${z.color}" stroke-width="16" fill="none" stroke-linecap="butt"/>`;
+    });
+    const needleAngle = (Math.max(0, Math.min(100, pct)) / 100) * 180;
+    const tip = polarToCartesian(cx, cy, r - 14, needleAngle);
+    const needle = `<line x1="${cx}" y1="${cy}" x2="${tip.x}" y2="${tip.y}" stroke="var(--chalk)" stroke-width="3" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="6" fill="var(--gold)"/>`;
+    svg.innerHTML = paths + needle;
+
+    const verdictEl = document.getElementById('gaugeVerdict');
+    const dist = Math.abs(pct - 50);
+    let strength = dist >= 15 ? 'Strong lean' : dist >= 5 ? 'Lean' : 'Toss-up';
+    let cls = 'toss';
+    let text = `${strength} — toss-up`;
+    if (pct > 55) { cls = 'take'; text = `${strength} toward this bet`; }
+    else if (pct < 45) { cls = 'fade'; text = `${strength} away from this bet`; }
+    verdictEl.className = 'gauge-verdict ' + cls;
+    verdictEl.textContent = text;
+  }
+
   document.getElementById('autoFillBtn').addEventListener('click', async () => {
     const errEl = document.getElementById('autoFillError');
     const noteEl = document.getElementById('autoFillNote');
@@ -773,6 +860,18 @@
         document.getElementById('teammateSel').value = data.injuries.teammate;
         notes.push(`Injuries: ${data.injuries.note}`);
       }
+      if (data.gameScript) {
+        document.getElementById('gameScriptSel').value = String(data.gameScript.script);
+        notes.push(`Game script: ${data.gameScript.note}`);
+      }
+      if (data.gameLog && data.gameLog.values && data.gameLog.values.length > 0) {
+        gamesList.innerHTML = '';
+        gameCount = 0;
+        data.gameLog.values.forEach(v => addGameRow(v));
+        notes.push(`Game log: ${data.gameLog.note}`);
+      } else if (data.gameLog) {
+        notes.push(`Game log: ${data.gameLog.note}`);
+      }
 
       noteEl.innerHTML = notes.join('<br>') + '<br><span class="muted">Double-check these against what you know — this pulls from an unofficial source and can be wrong or stale.</span>';
       noteEl.style.display = 'block';
@@ -794,28 +893,6 @@
     return 'other';
   }
 
-  function erf(x) {
-    const sign = x < 0 ? -1 : 1;
-    x = Math.abs(x);
-    const a1 =  0.254829592, a2 = -0.284496736, a3 = 1.421413741;
-    const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
-    const t = 1 / (1 + p * x);
-    const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
-    return sign * y;
-  }
-  function normalCDF(x, mean, std) {
-    if (std === 0) return x >= mean ? 1 : 0;
-    const z = (x - mean) / (std * Math.SQRT2);
-    return 0.5 * (1 + erf(z));
-  }
-
-  function getGameValues() {
-    return Array.from(document.querySelectorAll('.game-input'))
-      .map(i => parseFloat(i.value))
-      .filter(v => !isNaN(v));
-  }
-
-  // Returns { totalPct, factors: [{label, pct}] } -- only non-zero factors included
   function computeMatchupAdjustment(propType) {
     const cat = propCategory(propType);
     const factors = [];
@@ -939,6 +1016,8 @@
     document.getElementById('avgVal').textContent = mean.toFixed(1);
     document.getElementById('stdVal').textContent = std.toFixed(1);
 
+    drawGauge(adjProb * 100);
+
     const chart = document.getElementById('chart');
     chart.innerHTML = '';
     const maxVal = Math.max(...values, line) * 1.15;
@@ -1006,7 +1085,6 @@
     document.getElementById('healthSel').value = 'full';
     document.getElementById('teammateSel').value = 'none';
     document.getElementById('trendSel').value = 'normal';
-    document.getElementById('gameDateInput').value = '';
     gamesList.innerHTML = '';
     gameCount = 0;
     for (let i = 0; i < 5; i++) addGameRow();
