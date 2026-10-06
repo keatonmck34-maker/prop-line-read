@@ -478,7 +478,7 @@
 
     <div class="panel">
       <h2>Recent performances</h2>
-      <div class="subnote">Enter this stat from the player's last several games, or use auto-fill below.</div>
+      <div class="subnote">Enter this stat from the player's last several games.</div>
       <div class="games-list" id="gamesList"></div>
       <button class="add-game" id="addGame">+ Add a game</button>
     </div>
@@ -529,14 +529,29 @@
         </div>
       </div>
 
+      <div class="row2">
+        <div class="field">
+          <label for="gameScriptSel">Game script (spread)</label>
+          <select id="gameScriptSel">
+            <option value="0">Pick'em / even</option>
+            <option value="1">Slight favorite (-1 to -6.5)</option>
+            <option value="2">Big favorite (-7 or more)</option>
+            <option value="-1">Slight underdog (+1 to +6.5)</option>
+            <option value="-2">Big underdog (+7 or more)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="gameTotalInput">Game total (O/U)</label>
+          <input type="number" id="gameTotalInput" step="0.5" placeholder="e.g. 45.5 (leave blank to skip)">
+        </div>
+      </div>
+
       <div class="field">
-        <label for="gameScriptSel">Game script (spread)</label>
-        <select id="gameScriptSel">
-          <option value="0">Pick'em / even</option>
-          <option value="1">Slight favorite (-1 to -6.5)</option>
-          <option value="2">Big favorite (-7 or more)</option>
-          <option value="-1">Slight underdog (+1 to +6.5)</option>
-          <option value="-2">Big underdog (+7 or more)</option>
+        <label for="usageTrendSel">Usage trend (opportunity volume, last 2 games vs. earlier)</label>
+        <select id="usageTrendSel">
+          <option value="normal">Normal</option>
+          <option value="increasing">Increasing role</option>
+          <option value="decreasing">Decreasing role</option>
         </select>
       </div>
 
@@ -864,6 +879,16 @@
         document.getElementById('gameScriptSel').value = String(data.gameScript.script);
         notes.push(`Game script: ${data.gameScript.note}`);
       }
+      if (data.gameTotal) {
+        if (data.gameTotal.total != null) {
+          document.getElementById('gameTotalInput').value = data.gameTotal.total;
+        }
+        notes.push(`Game total: ${data.gameTotal.note}`);
+      }
+      if (data.usageTrend) {
+        document.getElementById('usageTrendSel').value = data.usageTrend.trend;
+        notes.push(`Usage trend: ${data.usageTrend.note}`);
+      }
       if (data.gameLog && data.gameLog.values && data.gameLog.values.length > 0) {
         gamesList.innerHTML = '';
         gameCount = 0;
@@ -893,10 +918,12 @@
     return 'other';
   }
 
+  // Returns { totalPct, factors: [{label, pct}] } -- only non-zero factors included
   function computeMatchupAdjustment(propType) {
     const cat = propCategory(propType);
     const factors = [];
 
+    // Defense rank
     const rankRaw = document.getElementById('defRank').value;
     if (rankRaw !== '') {
       const rank = Math.max(1, Math.min(32, parseFloat(rankRaw)));
@@ -904,10 +931,12 @@
       factors.push({ label: `Opponent rank vs stat (${rank})`, pct });
     }
 
+    // Location
     const location = document.getElementById('locationSel').value;
     const locPct = location === 'home' ? 0.03 : -0.03;
     factors.push({ label: location === 'home' ? 'Home game' : 'Away game', pct: locPct });
 
+    // Game script
     const script = parseFloat(document.getElementById('gameScriptSel').value);
     if (script !== 0) {
       let scriptPct = 0;
@@ -919,6 +948,7 @@
       }
     }
 
+    // Weather
     const weather = document.getElementById('weatherSel').value;
     if (weather !== 'good') {
       let wPct = 0;
@@ -934,12 +964,14 @@
       if (wPct !== 0) factors.push({ label: weather === 'wind' ? 'Windy conditions' : 'Rain or snow', pct: wPct });
     }
 
+    // Player health
     const health = document.getElementById('healthSel').value;
     if (health !== 'full') {
       const hPct = health === 'minor' ? -0.08 : -0.05;
       factors.push({ label: health === 'minor' ? 'Playing through minor injury' : 'Limited in practice', pct: hPct });
     }
 
+    // Teammate absence
     const teammate = document.getElementById('teammateSel').value;
     if (teammate !== 'none') {
       let tPct = 0;
@@ -950,10 +982,33 @@
       if (tPct !== 0) factors.push({ label, pct: tPct });
     }
 
+    // Recent trend
     const trend = document.getElementById('trendSel').value;
     if (trend !== 'normal') {
       const trPct = trend === 'hot' ? 0.06 : -0.06;
       factors.push({ label: trend === 'hot' ? 'Hot streak (last 3 games)' : 'Cold stretch (last 3 games)', pct: trPct });
+    }
+
+    const gameTotalRaw = document.getElementById('gameTotalInput').value;
+    if (gameTotalRaw !== '') {
+      const total = parseFloat(gameTotalRaw);
+      let weight = 0;
+      if (cat === 'pass' || cat === 'rec') weight = 0.008;
+      else if (cat === 'rush' || cat === 'rushrec') weight = 0.004;
+      else if (cat === 'td') weight = 0.006;
+      if (weight > 0) {
+        let totalPctEffect = (total - 44.5) * weight;
+        totalPctEffect = Math.max(-0.12, Math.min(0.12, totalPctEffect));
+        if (Math.abs(totalPctEffect) > 0.001) {
+          factors.push({ label: `Game total (${total})`, pct: totalPctEffect });
+        }
+      }
+    }
+
+    const usageTrend = document.getElementById('usageTrendSel').value;
+    if (usageTrend !== 'normal') {
+      const utPct = usageTrend === 'increasing' ? 0.07 : -0.07;
+      factors.push({ label: usageTrend === 'increasing' ? 'Usage trending up' : 'Usage trending down', pct: utPct });
     }
 
     let totalPct = factors.reduce((a, f) => a + f.pct, 0);
@@ -1085,6 +1140,8 @@
     document.getElementById('healthSel').value = 'full';
     document.getElementById('teammateSel').value = 'none';
     document.getElementById('trendSel').value = 'normal';
+    document.getElementById('gameTotalInput').value = '';
+    document.getElementById('usageTrendSel').value = 'normal';
     gamesList.innerHTML = '';
     gameCount = 0;
     for (let i = 0; i < 5; i++) addGameRow();
