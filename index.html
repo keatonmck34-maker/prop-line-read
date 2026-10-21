@@ -82,6 +82,7 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--focus);out
 .auth-tabs{display:flex;gap:4px;margin-bottom:20px}
 .auth-tabs button{flex:1;background:var(--panel);border:1px solid var(--panel-border);color:var(--muted);padding:12px;border-radius:var(--rad-s);font-family:inherit;cursor:pointer}
 .auth-tabs button.active{color:var(--turf-bright);border-color:var(--turf-bright)}
+a{color:var(--turf-bright)}
 .hidden{display:none!important}
 @media (max-width:480px){.row2{grid-template-columns:1fr}.stat-grid{gap:8px}}
 </style>
@@ -111,10 +112,12 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--focus);out
       <label for="authPassword">Password</label>
       <input type="password" id="authPassword" placeholder="At least 6 characters">
     </div>
+    <div class="field" id="ageRow" style="display:none"><label style="display:flex;gap:10px;align-items:flex-start;color:var(--chalk);font-size:13px;line-height:1.4"><input type="checkbox" id="ageCheck" style="width:22px;height:22px;flex-shrink:0;margin:0"><span>I am 18 or older and agree to the <a href="terms.html" target="_blank" rel="noopener">Terms</a> and <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</span></label></div>
     <button class="primary-btn" id="authSubmit">Log in</button>
     <div class="error-msg" id="authError" style="display:none;"></div>
     <div class="success-msg" id="authSuccess" style="display:none;"></div>
   </div>
+  <p class="subnote" style="padding:0;margin-top:16px"><a href="terms.html">Terms</a> · <a href="privacy.html">Privacy</a> · <a href="mailto:thegreenroomappofficial1@gmail.com?subject=The%20Green%20Room%20feedback">Send feedback</a></p>
 </div>
 
 <!-- MAIN APP (shown after login) -->
@@ -327,6 +330,7 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--focus);out
   <div class="disclaimer">
     This tool estimates probability from the games and matchup factors you enter. The matchup adjustments use reasonable football logic (defense strength, game script, weather, injuries, home/away, recent trend) but are not a statistically fitted or backtested model &mdash; treat the weights as directional, not precise. Small sample sizes (fewer than 5-6 games) make the underlying read unreliable regardless of adjustments. This does not access live sportsbook odds. Treat it as one input among many, not a prediction. If betting stops being fun or starts to feel out of control, the National Council on Problem Gambling helpline is 1-800-522-4700.
   </div>
+  <div class="disclaimer" style="margin-top:12px">Football data: <a href="https://nflverse.com" target="_blank" rel="noopener">nflverse</a> (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>), combined and summarized by The Green Room. <a href="https://open-meteo.com/" target="_blank" rel="noopener">Weather data by Open-Meteo.com</a> (CC BY 4.0). Not affiliated with the NFL or any sportsbook. <a href="terms.html">Terms</a> · <a href="privacy.html">Privacy</a> · <a href="mailto:thegreenroomappofficial1@gmail.com?subject=The%20Green%20Room%20feedback">Send feedback</a></div>
 </div>
 
 <script>
@@ -355,6 +359,7 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--focus);out
     document.getElementById('tabLogin').classList.add('active');
     document.getElementById('tabSignup').classList.remove('active');
     document.getElementById('authSubmit').textContent = 'Log in';
+    document.getElementById('ageRow').style.display = 'none';
   });
 
   document.getElementById('tabSignup').addEventListener('click', () => {
@@ -362,6 +367,7 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--focus);out
     document.getElementById('tabSignup').classList.add('active');
     document.getElementById('tabLogin').classList.remove('active');
     document.getElementById('authSubmit').textContent = 'Sign up';
+    document.getElementById('ageRow').style.display = 'flex';
   });
 
   document.getElementById('authSubmit').addEventListener('click', async () => {
@@ -373,7 +379,11 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--focus);out
     }
     try {
       if (authMode === 'signup') {
-        const { data, error } = await sb.auth.signUp({ email, password });
+        if (!document.getElementById('ageCheck').checked) {
+          showAuthMessage(authError, 'Please confirm you are 18 or older and agree to the Terms and Privacy Policy.');
+          return;
+        }
+        const { data, error } = await sb.auth.signUp({ email, password, options: { data: { age_confirmed: true, terms_accepted_at: new Date().toISOString() } } });
         if (error) throw error;
         if (data.user && !data.session) {
           showAuthMessage(authSuccess, 'Check your email to confirm your account, then log in.');
